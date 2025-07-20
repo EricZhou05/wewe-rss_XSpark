@@ -13,8 +13,8 @@ const LoginPage = () => {
       <Input
         value={codeValue}
         onValueChange={setCodeValue}
-        label="AuthCode"
-        placeholder="请输入auth code"
+        label="密码"
+        placeholder="请输入密码"
       />
       <Button
         color="primary"

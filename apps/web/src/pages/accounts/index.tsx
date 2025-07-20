@@ -93,7 +93,7 @@ const AccountPage = () => {
           color="primary"
           endContent={<PlusIcon />}
         >
-          添加读书账号
+          添加账号
         </Button>
       </div>
       <Table aria-label="Example static collection table">
@@ -179,7 +179,7 @@ const AccountPage = () => {
           {() => (
             <>
               <ModalHeader className="flex flex-col gap-1">
-                添加读书账号
+                添加账号
               </ModalHeader>
               <ModalBody>
                 <div className="m-auto pb-8 text-center">

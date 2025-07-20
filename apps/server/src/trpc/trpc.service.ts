@@ -126,7 +126,7 @@ export class TrpcService {
     });
 
     if (!account || account.length === 0) {
-      throw new Error('暂无可用读书账号!');
+      throw new Error('暂无可用账号!');
     }
 
     return account[Math.floor(Math.random() * account.length)];

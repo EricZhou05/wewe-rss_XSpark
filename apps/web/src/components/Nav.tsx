@@ -59,7 +59,8 @@ const Nav = () => {
                   发现新版本：v{releaseVersion}
                 </Link>
               )}
-              当前版本: v{appVersion}
+              上游当前版本: v{appVersion}
+			  <div className="block text-small">分支开发者：eric050@foxmail.com</div>
             </div>
           }
           placement="left"
@@ -72,16 +73,16 @@ const Nav = () => {
             >
               <Image
                 width={28}
-                alt="WeWe RSS"
+                alt="XSpark"
                 className="mr-2"
                 src={
                   serverOriginUrl
                     ? `${serverOriginUrl}/favicon.ico`
-                    : 'https://r2-assets.111965.xyz/wewe-rss.png'
+                    : 'https://cdn3.easylink.cc/d6a3153d-eff2-4c06-90a1-568c3a6e8faa_logo.png'
                 }
               ></Image>
             </Badge>
-            <p className="font-bold text-inherit">WeWe RSS</p>
+            <p className="font-bold text-inherit ml-2">星火调研易</p>
           </NavbarBrand>
         </Tooltip>
         <NavbarContent className="hidden sm:flex gap-4" justify="center">
@@ -101,7 +102,7 @@ const Nav = () => {
         <NavbarContent justify="end">
           <ThemeSwitcher></ThemeSwitcher>
           <Link
-            href="https://github.com/cooderl/wewe-rss"
+            href="https://github.com/EricZhou05/wewe-rss_XSpark"
             target="_blank"
             color="foreground"
           >

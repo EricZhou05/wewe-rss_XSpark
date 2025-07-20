@@ -379,10 +379,10 @@ const Feeds = () => {
                   size="sm"
                   showAnchorIcon
                   target="_blank"
-                  href={`${serverOriginUrl}/feeds/all.atom`}
+                  href={`${serverOriginUrl}/feeds/all.atom?limit=300`}
                   color="foreground"
                 >
-                  RSS
+                  导出选题
                 </Link>
               </div>
             )}
