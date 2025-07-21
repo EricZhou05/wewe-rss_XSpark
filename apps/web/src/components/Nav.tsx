@@ -78,7 +78,7 @@ const Nav = () => {
                 src={
                   serverOriginUrl
                     ? `${serverOriginUrl}/favicon.ico`
-                    : 'https://cdn3.easylink.cc/d6a3153d-eff2-4c06-90a1-568c3a6e8faa_logo.png'
+                    : 'https://free.picui.cn/free/2025/07/21/687e29b7d4e97.png'
                 }
               ></Image>
             </Badge>

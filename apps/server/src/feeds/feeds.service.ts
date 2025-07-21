@@ -278,7 +278,7 @@ export class FeedsService {
         mpIntro: '星火调研易 全部文章',
         mpCover: originUrl
           ? `${originUrl}/favicon.ico`
-          : 'https://cdn3.easylink.cc/d6a3153d-eff2-4c06-90a1-568c3a6e8faa_logo.png',
+          : 'https://free.picui.cn/free/2025/07/21/687e29b7d4e97.png',
         status: 1,
         syncTime: 0,
         updateTime: Math.floor(Date.now() / 1e3),
