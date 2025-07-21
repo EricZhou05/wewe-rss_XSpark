@@ -170,6 +170,10 @@ const Feeds = () => {
                 <ListboxItem
                   key={''}
                   href={`/feeds`}
+				  onClick={(e) => {
+					 e.preventDefault();
+					 navigate('/feeds');
+					}}				  
                   className={isActive('') ? 'bg-primary-50 text-primary' : ''}
                   startContent={<Avatar name="ALL"></Avatar>}
                 >
@@ -182,6 +186,10 @@ const Feeds = () => {
                   return (
                     <ListboxItem
                       href={`/feeds/${item.id}`}
+					  onClick={(e) => {
+						  e.preventDefault();
+						  navigate(`/feeds/${item.id}`);
+						}}					  
                       className={
                         isActive(item.id) ? 'bg-primary-50 text-primary' : ''
                       }
