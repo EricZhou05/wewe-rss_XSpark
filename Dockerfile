@@ -12,8 +12,8 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 
 RUN pnpm run -r build
 
-RUN pnpm deploy --filter=server --prod /app
-RUN pnpm deploy --filter=server --prod /app-sqlite
+RUN pnpm deploy --filter=server --prod /app --legacy
+RUN pnpm deploy --filter=server --prod /app-sqlite --legacy
 
 RUN cd /app && pnpm exec prisma generate
 
