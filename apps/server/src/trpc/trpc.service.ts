@@ -31,7 +31,7 @@ export class TrpcService {
   router = this.trpc.router;
   mergeRouters = this.trpc.mergeRouters;
   request: AxiosInstance;
-  updateDelayTime = 60;
+  updateDelayTime = 3;
 
   private readonly logger = new Logger(this.constructor.name);
 
