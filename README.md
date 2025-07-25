@@ -1,9 +1,9 @@
 <div align="center">
-<img src="https://raw.githubusercontent.com/cooderl/wewe-rss/main/assets/logo.png" width="80" alt="预览"/>
+<img src="https://raw.githubusercontent.com/EricZhou05/wewe-rss_XSpark/main/assets/logo2.png" width="130" alt="预览"/>
 
-# [WeWe RSS](https://github.com/cooderl/wewe-rss)
+# [星火调研易](https://github.com/EricZhou05/wewe-rss_XSpark)
 
-更优雅的微信公众号订阅方式。
+更优雅的微信公众号调研方式。
 
 ![主界面](https://raw.githubusercontent.com/cooderl/wewe-rss/main/assets/preview1.png)
 </div>
