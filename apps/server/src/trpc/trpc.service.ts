@@ -31,7 +31,7 @@ export class TrpcService {
   router = this.trpc.router;
   mergeRouters = this.trpc.mergeRouters;
   request: AxiosInstance;
-  updateDelayTime = 60;
+  updateDelayTime = 3;
 
   private readonly logger = new Logger(this.constructor.name);
 
@@ -220,7 +220,7 @@ export class TrpcService {
       },
     });
 
-    return { hasHistory };
+    return { hasHistory, articlesCount: articles.length };
   }
 
   inProgressHistoryMp = {
@@ -303,16 +303,74 @@ export class TrpcService {
       this.logger.log('refreshAllMpArticlesAndUpdateFeed is running');
       return;
     }
-    const mps = await this.prismaService.feed.findMany();
     this.isRefreshAllMpArticlesRunning = true;
     try {
-      for (const { id } of mps) {
-        await this.refreshMpArticlesAndUpdateFeed(id);
-
-        await new Promise((resolve) =>
-          setTimeout(resolve, this.updateDelayTime * 1e3),
+      const allMps = await this.prismaService.feed.findMany({
+        where: { status: statusMap.ENABLE },
+      });
+      if (allMps.length === 0) {
+        this.logger.log('没有需要更新的启用状态的订阅源。');
+        return;
+      }
+      let feedsToUpdate = allMps.map((mp) => mp.id);
+      let finalFailedFeeds: string[] = [];
+      // 设置最多尝试的轮数
+      const maxRounds = 8;
+      for (let round = 1; round <= maxRounds; round++) {
+        this.logger.log(
+          `--- 开始第 ${round}/${maxRounds} 轮更新，共 ${feedsToUpdate.length} 个订阅源 ---`,
+        );
+        const currentRoundFailedFeeds = new Set<string>();
+        for (const id of feedsToUpdate) {
+          try {
+            const { articlesCount } = await this.refreshMpArticlesAndUpdateFeed(
+              id,
+            );
+            if (articlesCount === 0) {
+              currentRoundFailedFeeds.add(id);
+            }
+          } catch (error) {
+            this.logger.error(
+              `在第 ${round} 轮更新订阅源 ${id} 时出错：`,
+              (error as Error).message,
+            );
+            currentRoundFailedFeeds.add(id);
+          }
+          // 在处理列表中的下一个订阅源之前等待
+          await new Promise((resolve) =>
+            setTimeout(resolve, this.updateDelayTime * 1e3),
+          );
+        }
+        finalFailedFeeds = Array.from(currentRoundFailedFeeds);
+        if (finalFailedFeeds.length === 0) {
+          this.logger.log(
+            `--- 第 ${round} 轮所有订阅源更新成功。 ---`,
+          );
+          break;
+        }
+        feedsToUpdate = finalFailedFeeds;
+        if (round < maxRounds) {
+          this.logger.log(
+            `--- 第 ${round} 轮更新结束。${finalFailedFeeds.length} 个订阅源更新失败。正在重试... ---`,
+          );
+        }
+      }
+      // 最终日志记录
+      const successCount = allMps.length - finalFailedFeeds.length;
+      const errorCount = finalFailedFeeds.length;
+      this.logger.log('--- 全部更新流程结束。 ---');
+      this.logger.log(`成功更新：${successCount} 个订阅源。`);
+      if (errorCount > 0) {
+        this.logger.error(`更新失败：${errorCount} 个订阅源。`);
+        this.logger.error(
+          `以下订阅源ID更新失败：${finalFailedFeeds.join(', ')}`,
         );
       }
+    } catch (e) {
+      this.logger.error(
+        '在执行 refreshAllMpArticlesAndUpdateFeed 期间发生意外错误：',
+        e,
+      );
     } finally {
       this.isRefreshAllMpArticlesRunning = false;
     }
