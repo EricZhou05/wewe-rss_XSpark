@@ -21,6 +21,7 @@ export type RefreshArticlesResult = {
   errorCount: number;
   failedFeeds: string[];
   hasHistory?: number;
+  articlesCount: number;
 };
 
 /**
@@ -243,6 +244,7 @@ export class TrpcService {
         errorCount: 0,
         failedFeeds: [],
         hasHistory,
+        articlesCount: articles.length,
       };
     } catch (error) {
       this.logger.error(`更新订阅源 ${mpId} 失败:`, error);
@@ -252,6 +254,7 @@ export class TrpcService {
         errorCount: 1,
         failedFeeds: [mpId],
         hasHistory: 1, // 失败时，假设还有历史，以便可以重试
+        articlesCount: 0,
       };
     }
   }
@@ -333,7 +336,7 @@ export class TrpcService {
 
   isRefreshAllMpArticlesRunning = false;
 
-  async refreshAllMpArticlesAndUpdateFeed(): Promise<RefreshArticlesResult> {
+  async refreshAllMpArticlesAndUpdateFeed(): Promise<Omit<RefreshArticlesResult, 'articlesCount'>> {
     if (this.isRefreshAllMpArticlesRunning) {
       this.logger.log('refreshAllMpArticlesAndUpdateFeed is running');
       // 如果已经在运行，返回一个特定的状态
@@ -370,7 +373,7 @@ export class TrpcService {
         for (const id of feedsToUpdate) {
           try {
             const result = await this.refreshMpArticlesAndUpdateFeed(id);
-            if (result.errorCount > 0) {
+            if (result.errorCount > 0 || result.articlesCount === 0) {
               currentRoundFailedFeeds.add(id);
             }
           } catch (error) {
