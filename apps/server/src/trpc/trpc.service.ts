@@ -301,7 +301,13 @@ export class TrpcService {
   async refreshAllMpArticlesAndUpdateFeed() {
     if (this.isRefreshAllMpArticlesRunning) {
       this.logger.log('refreshAllMpArticlesAndUpdateFeed is running');
-      return;
+      // 如果已经在运行，返回一个特定的状态
+      return {
+        message: '任务已在运行中',
+        successCount: -1, // 使用特殊值表示非正常结束
+        errorCount: -1,
+        failedFeeds: [],
+      };
     }
     this.isRefreshAllMpArticlesRunning = true;
     try {
@@ -310,7 +316,12 @@ export class TrpcService {
       });
       if (allMps.length === 0) {
         this.logger.log('没有需要更新的启用状态的订阅源。');
-        return;
+        return {
+          message: '没有需要更新的启用状态的订阅源。',
+          successCount: 0,
+          errorCount: 0,
+          failedFeeds: [],
+        };
       }
       let feedsToUpdate = allMps.map((mp) => mp.id);
       let finalFailedFeeds: string[] = [];
@@ -366,11 +377,25 @@ export class TrpcService {
           `以下订阅源ID更新失败：${finalFailedFeeds.join(', ')}`,
         );
       }
+      // 返回最终结果
+      return {
+        message: '更新流程结束',
+        successCount,
+        errorCount,
+        failedFeeds: finalFailedFeeds,
+      };
     } catch (e) {
       this.logger.error(
         '在执行 refreshAllMpArticlesAndUpdateFeed 期间发生意外错误：',
         e,
       );
+      // 发生未知错误时也返回错误信息
+      return {
+        message: '发生意外错误',
+        successCount: 0,
+        errorCount: (await this.prismaService.feed.findMany({ where: { status: statusMap.ENABLE } })).length,
+        failedFeeds: [],
+      };
     } finally {
       this.isRefreshAllMpArticlesRunning = false;
     }
