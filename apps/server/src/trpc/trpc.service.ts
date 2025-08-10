@@ -13,6 +13,17 @@ dayjs.extend(utc);
 dayjs.extend(timezone);
 
 /**
+ * tRPC procedure 的统一返回类型
+ */
+export type RefreshArticlesResult = {
+  message: string;
+  successCount: number;
+  errorCount: number;
+  failedFeeds: string[];
+  hasHistory?: number;
+};
+
+/**
  * 读书账号每日小黑屋
  */
 const blockedAccountsMap = new Map<string, string[]>();
@@ -171,56 +182,78 @@ export class TrpcService {
     }
   }
 
-  async refreshMpArticlesAndUpdateFeed(mpId: string, page = 1) {
-    const articles = await this.getMpArticles(mpId, page);
+  async refreshMpArticlesAndUpdateFeed(
+    mpId: string,
+    page = 1,
+  ): Promise<RefreshArticlesResult> {
+    try {
+      const articles = await this.getMpArticles(mpId, page);
 
-    if (articles.length > 0) {
-      let results;
-      const { type } =
-        this.configService.get<ConfigurationType['database']>('database')!;
-      if (type === 'sqlite') {
-        // sqlite3 不支持 createMany
-        const inserts = articles.map(({ id, picUrl, publishTime, title }) =>
-          this.prismaService.article.upsert({
-            create: { id, mpId, picUrl, publishTime, title },
-            update: {
+      if (articles.length > 0) {
+        let results;
+        const { type } =
+          this.configService.get<ConfigurationType['database']>('database')!;
+        if (type === 'sqlite') {
+          // sqlite3 不支持 createMany
+          const inserts = articles.map(({ id, picUrl, publishTime, title }) =>
+            this.prismaService.article.upsert({
+              create: { id, mpId, picUrl, publishTime, title },
+              update: {
+                publishTime,
+                title,
+              },
+              where: { id },
+            }),
+          );
+          results = await this.prismaService.$transaction(inserts);
+        } else {
+          results = await (this.prismaService.article as any).createMany({
+            data: articles.map(({ id, picUrl, publishTime, title }) => ({
+              id,
+              mpId,
+              picUrl,
               publishTime,
               title,
-            },
-            where: { id },
-          }),
+            })),
+            skipDuplicates: true,
+          });
+        }
+
+        this.logger.debug(
+          `refreshMpArticlesAndUpdateFeed create results: ${JSON.stringify(
+            results,
+          )}`,
         );
-        results = await this.prismaService.$transaction(inserts);
-      } else {
-        results = await (this.prismaService.article as any).createMany({
-          data: articles.map(({ id, picUrl, publishTime, title }) => ({
-            id,
-            mpId,
-            picUrl,
-            publishTime,
-            title,
-          })),
-          skipDuplicates: true,
-        });
       }
 
-      this.logger.debug(
-        `refreshMpArticlesAndUpdateFeed create results: ${JSON.stringify(results)}`,
-      );
-    }
+      // 如果文章数量小于 defaultCount，则认为没有更多历史文章
+      const hasHistory = articles.length < defaultCount ? 0 : 1;
 
-    // 如果文章数量小于 defaultCount，则认为没有更多历史文章
-    const hasHistory = articles.length < defaultCount ? 0 : 1;
+      await this.prismaService.feed.update({
+        where: { id: mpId },
+        data: {
+          syncTime: Math.floor(Date.now() / 1e3),
+          hasHistory,
+        },
+      });
 
-    await this.prismaService.feed.update({
-      where: { id: mpId },
-      data: {
-        syncTime: Math.floor(Date.now() / 1e3),
+      return {
+        message: `成功更新订阅源 ${mpId}。`,
+        successCount: 1,
+        errorCount: 0,
+        failedFeeds: [],
         hasHistory,
-      },
-    });
-
-    return { hasHistory, articlesCount: articles.length };
+      };
+    } catch (error) {
+      this.logger.error(`更新订阅源 ${mpId} 失败:`, error);
+      return {
+        message: `更新订阅源 ${mpId} 失败。`,
+        successCount: 0,
+        errorCount: 1,
+        failedFeeds: [mpId],
+        hasHistory: 1, // 失败时，假设还有历史，以便可以重试
+      };
+    }
   }
 
   inProgressHistoryMp = {
@@ -272,10 +305,12 @@ export class TrpcService {
           );
           break;
         }
-        const { hasHistory } = await this.refreshMpArticlesAndUpdateFeed(
+		
+        const { hasHistory = 1 } = await this.refreshMpArticlesAndUpdateFeed(
           mpId,
           this.inProgressHistoryMp.page,
         );
+
         if (hasHistory < 1) {
           this.logger.log(
             `getHistoryMpArticles(${mpId}) has no history, break`,
@@ -298,7 +333,7 @@ export class TrpcService {
 
   isRefreshAllMpArticlesRunning = false;
 
-  async refreshAllMpArticlesAndUpdateFeed() {
+  async refreshAllMpArticlesAndUpdateFeed(): Promise<RefreshArticlesResult> {
     if (this.isRefreshAllMpArticlesRunning) {
       this.logger.log('refreshAllMpArticlesAndUpdateFeed is running');
       // 如果已经在运行，返回一个特定的状态
@@ -334,10 +369,8 @@ export class TrpcService {
         const currentRoundFailedFeeds = new Set<string>();
         for (const id of feedsToUpdate) {
           try {
-            const { articlesCount } = await this.refreshMpArticlesAndUpdateFeed(
-              id,
-            );
-            if (articlesCount === 0) {
+            const result = await this.refreshMpArticlesAndUpdateFeed(id);
+            if (result.errorCount > 0) {
               currentRoundFailedFeeds.add(id);
             }
           } catch (error) {
@@ -393,7 +426,11 @@ export class TrpcService {
       return {
         message: '发生意外错误',
         successCount: 0,
-        errorCount: (await this.prismaService.feed.findMany({ where: { status: statusMap.ENABLE } })).length,
+        errorCount: (
+          await this.prismaService.feed.findMany({
+            where: { status: statusMap.ENABLE },
+          })
+        ).length,
         failedFeeds: [],
       };
     } finally {
