@@ -450,7 +450,7 @@ const Feeds = () => {
                 <Button
                   color="primary"
                   isDisabled={
-                    !wxsLink.startsWith('https://mp.weixin.qq.com/s/')
+                    !wxsLink.trim() || !wxsLink.includes('https://mp.weixin.qq.com/s/')
                   }
                   onPress={handleConfirm}
                   isLoading={
