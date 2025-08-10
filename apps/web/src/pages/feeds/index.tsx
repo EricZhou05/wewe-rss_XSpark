@@ -364,7 +364,33 @@ const Feeds = () => {
                     onClick={async (ev) => {
                       ev.preventDefault();
                       ev.stopPropagation();
-                      await refreshMpArticles({});
+
+                      // 调用 mutation 并等待结果
+                      const result = await refreshMpArticles({});
+
+                      // 根据返回结果显示不同的 toast
+                      if (result && result.errorCount > 0) {
+                        toast.error(
+                          `更新失败：${result.errorCount} 个订阅源。`,
+                          {
+                            description: `失败的订阅源ID: ${result.failedFeeds.join(', ')}`,
+                            // 设置一个非常大的持续时间，使其不会自动关闭
+                            duration: Infinity,
+                            // 在 sonner v1+ 中，可以通过 action 添加关闭按钮
+                            action: {
+                              label: '关闭',
+                              onClick: () => toast.dismiss(),
+                            },
+                          }
+                        );
+                      } else if (result && result.successCount >= 0) {
+                        toast.success(`更新完成`, {
+                          description: `成功更新：${result.successCount} 个订阅源。`,
+                        });
+                      } else if (result) {
+                        // 处理任务已在运行中或其他特殊情况
+                        toast.info(result.message || '未知状态');
+                      }
                       await refetchFeedList();
                       await queryUtils.article.list.reset();
                     }}
