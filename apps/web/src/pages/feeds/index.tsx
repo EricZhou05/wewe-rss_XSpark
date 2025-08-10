@@ -319,7 +319,7 @@ const Feeds = () => {
                       ev.preventDefault();
                       ev.stopPropagation();
 
-                      if (window.confirm('确定删除吗？')) {
+                      if (confirm('确定删除吗？')) {
                         await deleteFeed(currentMpInfo.id);
                         navigate('/feeds');
                         await refetchFeedList();
