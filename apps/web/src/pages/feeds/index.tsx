@@ -319,7 +319,7 @@ const Feeds = () => {
                       ev.preventDefault();
                       ev.stopPropagation();
 
-                      if (window.confirm('确定删除吗？')) {
+                      if (confirm('确定删除吗？')) {
                         await deleteFeed(currentMpInfo.id);
                         navigate('/feeds');
                         await refetchFeedList();
@@ -364,7 +364,45 @@ const Feeds = () => {
                     onClick={async (ev) => {
                       ev.preventDefault();
                       ev.stopPropagation();
-                      await refreshMpArticles({});
+
+                      // 调用 mutation 并等待结果
+                      const result = await refreshMpArticles({});
+
+                      // 根据返回结果显示不同的 toast
+                      if (result && result.errorCount > 0) {
+                        // 失败ID储存
+                        const failedIdsText = result.failedFeeds.join('\n');
+
+                        const toastId = toast.error(
+                          `更新失败：${result.errorCount} 个订阅源。`,
+                          {
+                            description: `失败的ID: ${result.failedFeeds.join(', ')}`,
+                            // 设置一个非常大的持续时间，使其不会自动关闭
+                            duration: Infinity,
+                            action: {
+                              label: '复制并关闭',
+                              onClick: async () => {
+                                try {
+                                  await navigator.clipboard.writeText(failedIdsText);
+                                  toast.success('复制成功');
+                                } catch (err) {
+                                  console.error('复制失败: ', err);
+                                  toast.error('复制失败，请检查浏览器设置');
+                                } finally {
+                                  toast.dismiss(toastId);
+                                }
+                              },
+                            },
+                          }
+                        );
+                      } else if (result && result.successCount >= 0) {
+                        toast.success(`更新完成`, {
+                          description: `成功更新：${result.successCount} 个订阅源。`,
+                        });
+                      } else if (result) {
+                        // 处理任务已在运行中或其他特殊情况
+                        toast.info(result.message || '未知状态');
+                      }
                       await refetchFeedList();
                       await queryUtils.article.list.reset();
                     }}
@@ -424,7 +462,7 @@ const Feeds = () => {
                 <Button
                   color="primary"
                   isDisabled={
-                    !wxsLink.startsWith('https://mp.weixin.qq.com/s/')
+                    !wxsLink.trim() || !wxsLink.includes('https://mp.weixin.qq.com/s/')
                   }
                   onPress={handleConfirm}
                   isLoading={
