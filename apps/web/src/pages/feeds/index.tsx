@@ -370,16 +370,28 @@ const Feeds = () => {
 
                       // 根据返回结果显示不同的 toast
                       if (result && result.errorCount > 0) {
-                        toast.error(
+                        // 失败ID储存
+                        const failedIdsText = result.failedFeeds.join('\n');
+
+                        const toastId = toast.error(
                           `更新失败：${result.errorCount} 个订阅源。`,
                           {
-                            description: `失败的订阅源ID: ${result.failedFeeds.join(', ')}`,
+                            description: `失败的ID: ${result.failedFeeds.join(', ')}`,
                             // 设置一个非常大的持续时间，使其不会自动关闭
                             duration: Infinity,
-                            // 在 sonner v1+ 中，可以通过 action 添加关闭按钮
                             action: {
-                              label: '关闭',
-                              onClick: () => toast.dismiss(),
+                              label: '复制并关闭',
+                              onClick: async () => {
+                                try {
+                                  await navigator.clipboard.writeText(failedIdsText);
+                                  toast.success('复制成功');
+                                } catch (err) {
+                                  console.error('复制失败: ', err);
+                                  toast.error('复制失败，请检查浏览器设置');
+                                } finally {
+                                  toast.dismiss(toastId);
+                                }
+                              },
                             },
                           }
                         );
