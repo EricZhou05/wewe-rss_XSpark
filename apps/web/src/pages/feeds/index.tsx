@@ -258,6 +258,7 @@ const Feeds = () => {
     }
   };
 
+  // @ts-ignore
   return (
     <>
       <div className="h-full flex justify-between">
@@ -530,10 +531,10 @@ const Feeds = () => {
                 </Tooltip>
 
                 <Divider orientation="vertical" />
+
                 <Select
                   size="sm"
-                  labelPlacement='outside-left'
-                  className="w-34"
+                  className="w-32 flex-shrink-0"
                   selectedKeys={[timeRange]}
                   onChange={(e) => setTimeRange(e.target.value)}
                   aria-label="时间范围选择"
