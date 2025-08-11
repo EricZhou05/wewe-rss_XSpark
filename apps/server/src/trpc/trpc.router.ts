@@ -132,6 +132,14 @@ export class TrpcRouter {
       }),
   });
 
+  // 定义 procedure 的输出 Zod schema
+  RefreshArticlesOutput = z.object({
+      message: z.string(),
+      successCount: z.number(),
+      errorCount: z.number(),
+      failedFeeds: z.array(z.string()),
+  });
+
   feedRouter = this.trpcService.router({
     list: this.trpcService.protectedProcedure
       .input(
@@ -246,11 +254,12 @@ export class TrpcRouter {
           mpId: z.string().optional(),
         }),
       )
+      .output(this.RefreshArticlesOutput) 
       .mutation(async ({ input: { mpId } }) => {
         if (mpId) {
-          await this.trpcService.refreshMpArticlesAndUpdateFeed(mpId);
+          return this.trpcService.refreshMpArticlesAndUpdateFeed(mpId);
         } else {
-          await this.trpcService.refreshAllMpArticlesAndUpdateFeed();
+          return this.trpcService.refreshAllMpArticlesAndUpdateFeed();
         }
       }),
 
@@ -440,10 +449,8 @@ export class TrpcRouter {
           }
           return {
             errorMsg: null,
+            trpcService: this.trpcService,
           };
-        },
-        middleware: (req, res, next) => {
-          next();
         },
       }),
     );
