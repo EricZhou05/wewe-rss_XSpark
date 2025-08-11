@@ -12,6 +12,12 @@ import { load } from 'cheerio';
 import { minify } from 'html-minifier';
 import { LRUCache } from 'lru-cache';
 import pMap from '@cjs-exporter/p-map';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 console.log('CRON_EXPRESSION: ', process.env.CRON_EXPRESSION);
 
@@ -55,7 +61,7 @@ export class FeedsService {
       },
       hooks: {
         beforeRetry: [
-          async (options, error, retryCount) => {
+          (options, error, retryCount) => {
             this.logger.warn(`retrying ${options.url}...`);
             return new Promise((resolve) =>
               setTimeout(resolve, 2e3 * (retryCount || 1)),
@@ -114,12 +120,10 @@ export class FeedsService {
       '<style> .rich_media_content {overflow: hidden;color: #222;font-size: 17px;word-wrap: break-word;-webkit-hyphens: auto;-ms-hyphens: auto;hyphens: auto;text-align: justify;position: relative;z-index: 0;}.rich_media_content {font-size: 18px;}</style>' +
       html;
 
-    const result = minify(content, {
+    return minify(content, {
       removeAttributeQuotes: true,
       collapseWhitespace: true,
     });
-
-    return result;
   }
 
   async getHtmlByUrl(url: string) {
@@ -127,8 +131,7 @@ export class FeedsService {
     if (
       this.configService.get<ConfigurationType['feed']>('feed')!.enableCleanHtml
     ) {
-      const result = await this.cleanHtml(html);
-      return result;
+      return this.cleanHtml(html);
     }
 
     return html;
@@ -150,11 +153,11 @@ export class FeedsService {
   }
 
   async renderFeed({
-    type,
-    feedInfo,
-    articles,
-    mode,
-  }: {
+                     type,
+                     feedInfo,
+                     articles,
+                     mode,
+                   }: {
     type: string;
     feedInfo: FeedInfo;
     articles: Article[];
@@ -190,9 +193,7 @@ export class FeedsService {
 
     /**mode 高于 globalMode。如果 mode 值存在，取 mode 值*/
     const enableFullText =
-      typeof mode === 'string'
-        ? mode === 'fulltext'
-        : globalMode === 'fulltext';
+      mode ? mode === 'fulltext' : globalMode === 'fulltext';
 
     const showAuthor = feedInfo.id === 'all';
 
@@ -225,15 +226,39 @@ export class FeedsService {
     return feed;
   }
 
+  async renderTxtFeed({
+                        articles,
+                      }: {
+    articles: Article[];
+  }) {
+    const feeds = await this.prismaService.feed.findMany({
+      select: { id: true, mpName: true },
+    });
+
+    let content = '';
+    for (const item of articles) {
+      const mpName = feeds.find((feed) => feed.id === item.mpId)?.mpName || '未知公众号';
+      const publishTime = dayjs.unix(item.publishTime).tz('Asia/Shanghai').format('YYYY-M-D_HH:mm:ss');
+      const link = `https://mp.weixin.qq.com/s/${item.id}`;
+
+      content += `${item.title}(${mpName})\n`;
+      content += `${publishTime}\n`;
+      content += `${link}\n\n`;
+    }
+    return content.trim();
+  }
+
   async handleGenerateFeed({
-    id,
-    type,
-    limit,
-    page,
-    mode,
-    title_include,
-    title_exclude,
-  }: {
+                             id,
+                             type,
+                             limit,
+                             page,
+                             mode,
+                             title_include,
+                             title_exclude,
+                             startTime,
+                             endTime,
+                           }: {
     id?: string;
     type: string;
     limit: number;
@@ -241,6 +266,8 @@ export class FeedsService {
     mode?: string;
     title_include?: string;
     title_exclude?: string;
+    startTime?: number;
+    endTime?: number;
   }) {
     if (!feedTypes.includes(type as any)) {
       type = 'atom';
@@ -248,6 +275,18 @@ export class FeedsService {
 
     let articles: Article[];
     let feedInfo: FeedInfo;
+
+    const whereCondition: any = {};
+    if (id) {
+      whereCondition.mpId = id;
+    }
+    if (startTime && endTime && startTime > 0 && endTime > 0) {
+      whereCondition.publishTime = {
+        gte: startTime,
+        lte: endTime,
+      };
+    }
+
     if (id) {
       feedInfo = (await this.prismaService.feed.findFirst({
         where: { id },
@@ -258,13 +297,14 @@ export class FeedsService {
       }
 
       articles = await this.prismaService.article.findMany({
-        where: { mpId: id },
+        where: whereCondition,
         orderBy: { publishTime: 'desc' },
         take: limit,
         skip: (page - 1) * limit,
       });
     } else {
       articles = await this.prismaService.article.findMany({
+        where: whereCondition,
         orderBy: { publishTime: 'desc' },
         take: limit,
         skip: (page - 1) * limit,
@@ -289,6 +329,12 @@ export class FeedsService {
     }
 
     this.logger.log('handleGenerateFeed articles: ' + articles.length);
+
+    if (type === 'txt') {
+      const content = await this.renderTxtFeed({ articles });
+      return { content, mimeType: feedMimeTypeMap[type] };
+    }
+
     const feed = await this.renderFeed({ feedInfo, articles, type, mode });
 
     if (title_include) {
@@ -309,6 +355,9 @@ export class FeedsService {
         return { content: feed.rss2(), mimeType: feedMimeTypeMap[type] };
       case 'json':
         return { content: feed.json1(), mimeType: feedMimeTypeMap[type] };
+      case 'txt':
+        const txtContent = await this.renderTxtFeed({ articles });
+        return { content: txtContent, mimeType: feedMimeTypeMap[type] };
       case 'atom':
       default:
         return { content: feed.atom1(), mimeType: feedMimeTypeMap[type] };

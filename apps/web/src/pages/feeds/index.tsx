@@ -15,6 +15,8 @@ import {
   Tooltip,
   useDisclosure,
   Link,
+  Select,
+  SelectItem,
 } from '@nextui-org/react';
 import { PlusIcon } from '@web/components/PlusIcon';
 import { trpc } from '@web/utils/trpc';
@@ -22,8 +24,13 @@ import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import dayjs from 'dayjs';
+import customParseFormat from 'dayjs/plugin/customParseFormat';
 import { serverOriginUrl } from '@web/utils/env';
 import ArticleList from './list';
+import { Document, Packer, Paragraph, TextRun, ExternalHyperlink } from 'docx';
+import { saveAs } from 'file-saver';
+
+dayjs.extend(customParseFormat);
 
 const Feeds = () => {
   const { id } = useParams();
@@ -70,6 +77,7 @@ const Feeds = () => {
   const [wxsLink, setWxsLink] = useState('');
 
   const [currentMpId, setCurrentMpId] = useState(id || '');
+  const [timeRange, setTimeRange] = useState('yesterday');
 
   const handleConfirm = async () => {
     console.log('wxsLink', wxsLink);
@@ -142,6 +150,114 @@ const Feeds = () => {
     document.body.removeChild(link);
   };
 
+  const handleExportDoc = async () => {
+    const now = dayjs();
+    let startTime;
+
+    switch (timeRange) {
+      case 'today':
+        startTime = now.startOf('day');
+        break;
+      case 'yesterday':
+        startTime = now.subtract(1, 'day').startOf('day');
+        break;
+      case 'day_before_yesterday':
+        startTime = now.subtract(2, 'day').startOf('day');
+        break;
+      case 'three_days_ago':
+        startTime = now.subtract(3, 'day').startOf('day');
+        break;
+      default:
+        startTime = now.subtract(1, 'day').startOf('day');
+    }
+
+    const startTimeUnix = startTime.unix();
+    const endTimeUnix = now.unix();
+
+    try {
+      const response = await fetch(`${serverOriginUrl}/feeds/all.txt?startTime=${startTimeUnix}&endTime=${endTimeUnix}&limit=999`);
+      if (!response.ok) {
+        toast.error(`网络响应错误: ${response.statusText}`);
+        return;
+      }
+      const textContent = await response.text();
+
+      if (!textContent.trim()) {
+        toast.info('该时间范围内没有内容可导出');
+        return;
+      }
+
+      const articles = textContent.trim().split('\n\n').map(block => {
+        const lines = block.split('\n');
+        return {
+          title: lines[0],
+          time: lines[1],
+          link: lines[2],
+        };
+      });
+
+      const doc = new Document({
+        styles: {
+          paragraphStyles: [
+            {
+              id: "Hyperlink",
+              name: "Hyperlink",
+              basedOn: "Normal",
+              next: "Normal",
+              quickFormat: true,
+              run: {
+                color: "0000FF",
+                underline: {
+                  type: "single",
+                  color: "0000FF",
+                },
+              },
+            },
+          ]
+        },
+        sections: [{
+          children: articles.flatMap(article => [
+            new Paragraph({
+              children: [new TextRun(article.title)],
+              spacing: { after: 120 }, // 约等于 6pt
+            }),
+            new Paragraph({
+              children: [new TextRun(article.time)],
+              spacing: { after: 120 },
+            }),
+            new Paragraph({
+              children: [
+                new ExternalHyperlink({
+                  children: [
+                    new TextRun({
+                      text: article.link,
+                      style: "Hyperlink",
+                    }),
+                  ],
+                  link: article.link,
+                }),
+              ],
+              spacing: { after: 240 }, // 约等于 12pt, 制造段间距
+            }),
+          ]),
+        }],
+      });
+
+      const firstDate = dayjs(articles[articles.length - 1].time, "YYYY-M-D_HH:mm:ss").format('MM.DD');
+      const lastDate = dayjs(articles[0].time, "YYYY-M-D_HH:mm:ss").format('MM.DD');
+      const filename = `星火选题库(${firstDate}_${lastDate}).docx`;
+
+      Packer.toBlob(doc).then(blob => {
+        saveAs(blob, filename);
+        toast.success('导出成功!');
+      });
+
+    } catch (error) {
+      console.error('导出失败:', error);
+      toast.error('导出失败，请查看控制台获取更多信息。');
+    }
+  };
+
   return (
     <>
       <div className="h-full flex justify-between">
@@ -170,10 +286,10 @@ const Feeds = () => {
                 <ListboxItem
                   key={''}
                   href={`/feeds`}
-				  onClick={(e) => {
-					 e.preventDefault();
-					 navigate('/feeds');
-					}}				  
+                  onClick={(e) => {
+                    e.preventDefault();
+                    navigate('/feeds');
+                  }}
                   className={isActive('') ? 'bg-primary-50 text-primary' : ''}
                   startContent={<Avatar name="ALL"></Avatar>}
                 >
@@ -186,10 +302,10 @@ const Feeds = () => {
                   return (
                     <ListboxItem
                       href={`/feeds/${item.id}`}
-					  onClick={(e) => {
-						  e.preventDefault();
-						  navigate(`/feeds/${item.id}`);
-						}}					  
+                      onClick={(e) => {
+                        e.preventDefault();
+                        navigate(`/feeds/${item.id}`);
+                      }}
                       className={
                         isActive(item.id) ? 'bg-primary-50 text-primary' : ''
                       }
@@ -350,7 +466,7 @@ const Feeds = () => {
                 </Tooltip>
               </div>
             ) : (
-              <div className="flex gap-2">
+              <div className="flex gap-2 items-center">
                 <Tooltip
                   content="频繁调用可能会导致一段时间内不可用"
                   color="danger"
@@ -412,24 +528,29 @@ const Feeds = () => {
                       : '更新全部'}
                   </Link>
                 </Tooltip>
-                <Link
-                  href="#"
-                  color="foreground"
-                  onClick={handleExportOpml}
-                  size="sm"
-                >
-                  导出OPML
-                </Link>
+
                 <Divider orientation="vertical" />
-                <Link
+                <Select
                   size="sm"
-                  showAnchorIcon
-                  target="_blank"
-                  href={`${serverOriginUrl}/feeds/all.atom?limit=300`}
-                  color="foreground"
+                  labelPlacement='outside-left'
+                  className="w-34"
+                  selectedKeys={[timeRange]}
+                  onChange={(e) => setTimeRange(e.target.value)}
+                  aria-label="时间范围选择"
+                >
+                  <SelectItem key="today" value="today">今天</SelectItem>
+                  <SelectItem key="yesterday" value="yesterday">昨天至今</SelectItem>
+                  <SelectItem key="day_before_yesterday" value="day_before_yesterday">前天至今</SelectItem>
+                  <SelectItem key="three_days_ago" value="three_days_ago">大前天至今</SelectItem>
+                </Select>
+                <Button
+                  size="sm"
+                  color="primary"
+                  variant="flat"
+                  onClick={handleExportDoc}
                 >
                   导出选题
-                </Link>
+                </Button>
               </div>
             )}
           </div>
