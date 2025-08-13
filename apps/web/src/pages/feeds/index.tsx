@@ -536,7 +536,12 @@ const Feeds = () => {
                   size="sm"
                   className="w-32 flex-shrink-0"
                   selectedKeys={[timeRange]}
-                  onChange={(e) => setTimeRange(e.target.value)}
+                  onChange={(e) => {
+                    // 只有当选择的值不为空时才更新状态
+                    if (e.target.value) {
+                      setTimeRange(e.target.value);
+                    }
+                  }}
                   aria-label="时间范围选择"
                 >
                   <SelectItem key="today" value="today">今天</SelectItem>
