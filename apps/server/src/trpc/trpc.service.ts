@@ -43,7 +43,7 @@ export class TrpcService {
   router = this.trpc.router;
   mergeRouters = this.trpc.mergeRouters;
   request: AxiosInstance;
-  updateDelayTime = 3;
+  updateDelayTime = 1;
 
   private readonly logger = new Logger(this.constructor.name);
 
@@ -364,7 +364,7 @@ export class TrpcService {
       let feedsToUpdate = allMps.map((mp) => mp.id);
       let finalFailedFeeds: string[] = [];
       // 设置最多尝试的轮数
-      const maxRounds = 8;
+      const maxRounds = 10;
       for (let round = 1; round <= maxRounds; round++) {
         this.logger.log(
           `--- 开始第 ${round}/${maxRounds} 轮更新，共 ${feedsToUpdate.length} 个订阅源 ---`,
