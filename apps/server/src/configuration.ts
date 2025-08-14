@@ -4,7 +4,7 @@ const configuration = () => {
   const host = process.env.HOST || '0.0.0.0';
 
   const maxRequestPerMinute = parseInt(
-    process.env.MAX_REQUEST_PER_MINUTE || '3', 10
+    process.env.MAX_REQUEST_PER_MINUTE || '2', 10
   );
 
   const authCode = process.env.AUTH_CODE;
@@ -15,7 +15,7 @@ const configuration = () => {
 
   const databaseType = process.env.DATABASE_TYPE || 'mysql';
 
-  const updateDelayTime = parseInt(process.env.UPDATE_DELAY_TIME || '3', 10);
+  const updateDelayTime = parseInt(process.env.UPDATE_DELAY_TIME || '2', 10);
 
   const enableCleanHtml = process.env.ENABLE_CLEAN_HTML === 'true';
   return {
